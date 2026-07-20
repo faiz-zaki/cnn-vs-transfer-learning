@@ -1,0 +1,213 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Perbandingan CNN from Scratch dan Transfer Learning untuk Klasifikasi Citra Pesawat dan Mobil}
+
+\author{\IEEEauthorblockN{FAIZ ZAKI\\NIM: 452024611006}
+\IEEEauthorblockA{\textit{Program Studi Teknik Informatika}\\
+\textit{Universitas Darussalam Gontor}\\
+Ponorogo, Indonesia \\
+faizzaki@student.cs.unida.gontor.ac.id}}
+
+\maketitle
+
+\begin{abstract}
+Penelitian ini membandingkan dua pendekatan klasifikasi citra: CNN from scratch dan Transfer Learning menggunakan ResNet18. Eksperimen dilakukan pada dataset CIFAR-10 (2 kelas: airplane dan automobile) untuk kedua pendekatan. CNN from scratch mencapai akurasi testing 96.90\% dengan 618.754 parameter dan waktu training 20,18 detik, sementara Transfer Learning mencapai 96.70\% dengan 11.308.354 parameter dan waktu training 112,84 detik. Hasil menunjukkan bahwa CNN from scratch unggul tipis dalam akurasi dan jauh lebih cepat untuk dataset CIFAR-10 beresolusi rendah, namun Transfer Learning lebih stabil dengan gap overfitting yang lebih kecil.
+\end{abstract}
+
+\begin{IEEEkeywords}
+CNN, Transfer Learning, ResNet18, Klasifikasi Citra, CIFAR-10, Pesawat, Mobil
+\end{IEEEkeywords}
+
+\section{Pendahuluan}
+Klasifikasi citra merupakan salah satu tugas fundamental dalam computer vision. Dua pendekatan utama yang sering digunakan adalah Convolutional Neural Network (CNN) yang dilatih dari awal (from scratch) dan Transfer Learning yang memanfaatkan model pretrained pada dataset besar seperti ImageNet~\cite{imagenet}. Masing-masing pendekatan memiliki kelebihan dan kekurangan yang perlu dipahami untuk memilih strategi yang tepat sesuai kebutuhan.
+
+Tujuan penelitian ini adalah membandingkan performa, efisiensi, dan ketahanan terhadap overfitting dari kedua pendekatan pada dataset yang sama (CIFAR-10 kelas airplane dan automobile), serta memberikan rekomendasi penggunaan berdasarkan karakteristik dataset dan sumber daya komputasi.
+
+\section{Dataset}
+\subsection{CIFAR-10 (Airplane vs Automobile)}
+Dataset CIFAR-10~\cite{krizhevsky2009} terdiri dari 60.000 gambar berwarna berukuran $32\times32$ piksel yang terbagi dalam 10 kelas. Untuk eksperimen ini, hanya dua kelas yang digunakan: \textit{airplane} (label 0) dan \textit{automobile} (label 1). Total data yang digunakan adalah 10.000 gambar train dan 2.000 gambar test, dengan komposisi seimbang 5.000 pesawat dan 5.000 mobil. Dataset diunduh melalui \texttt{torchvision.datasets.CIFAR10}.
+
+\subsection{Pembagian Data}
+Dataset dibagi dengan rasio 70:15:15 untuk train, validation, dan test. Pembagian dilakukan secara \textit{stratified} untuk menjaga proporsi kelas tetap seimbang. Detail pembagian:
+\begin{itemize}
+\item Training: 8.500 gambar (70\%)
+\item Validation: 1.500 gambar (15\%)
+\item Testing: 2.000 gambar (15\%)
+\end{itemize}
+
+\subsection{Normalisasi dan Augmentasi}
+Piksel dinormalisasi menggunakan mean dan standar deviasi dataset CIFAR-10: mean = (0.4914, 0.4822, 0.4465) dan std = (0.2470, 0.2435, 0.2616). Augmentasi data diterapkan untuk mengurangi overfitting:
+\begin{itemize}
+\item \textbf{CNN from Scratch}: Random horizontal flip, random rotation $\pm 10^\circ$, \textit{color jitter}, dan random affine transformation.
+\item \textbf{Transfer Learning}: Random horizontal flip, random rotation $\pm 10^\circ$, serta resize ke $224\times224$ (input size ResNet18).
+\end{itemize}
+
+\section{Metodologi}
+\subsection{Pipeline PyTorch}
+Kedua model menggunakan \texttt{DataLoader} PyTorch dengan \textit{batch size} 32 untuk CNN dan 32 untuk Transfer Learning. Augmentasi diterapkan secara dinamis per-batch menggunakan \texttt{torchvision.transforms}. Optimizer yang digunakan adalah Adam dengan \textit{learning rate} 0.001.
+
+\section{CNN from Scratch}
+\subsection{Arsitektur}
+Arsitektur CNN terdiri dari tiga blok konvolusi yang masing-masing diikuti \textit{Batch Normalization}, aktivasi ReLU, dan \textit{Max Pooling} $2\times2$. Setelah itu, layer \textit{Flatten} digunakan untuk mereduksi dimensi, diikuti dua \textit{dense layer} dengan Dropout:
+\begin{itemize}
+\item \textbf{Block 1}: Conv2D(32, $3\times3$, padding=1) + BN + ReLU + MaxPool(2,2)
+\item \textbf{Block 2}: Conv2D(64, $3\times3$, padding=1) + BN + ReLU + MaxPool(2,2)
+\item \textbf{Block 3}: Conv2D(128, $3\times3$, padding=1) + BN + ReLU + MaxPool(2,2)
+\item \textbf{Classifier}: Flatten + Dropout(0.5) + Dense(2048$\rightarrow$256, ReLU) + Dropout(0.3) + Dense(256$\rightarrow$2, softmax)
+\end{itemize}
+
+\subsection{Justifikasi Arsitektur}
+\begin{itemize}
+\item \textbf{3 blok konvolusi}: cukup untuk menangkap fitur hierarkis pada input $32\times32$. Blok yang lebih banyak dapat menyebabkan representasi terlalu abstrak untuk resolusi kecil.
+\item \textbf{Filter size $3\times3$}: ukuran standar yang menangkap fitur lokal dengan parameter efisien~\cite{simonyan2014}. Stacking dua Conv3$\times$3 setara dengan \textit{receptive field} $5\times5$ dengan lebih sedikit parameter.
+\item \textbf{Batch Normalization}: mempercepat konvergensi, menstabilkan distribusi aktivasi, dan memberi efek regularisasi ringan.
+\item \textbf{Dropout(0.5 dan 0.3)}: regularisasi untuk mencegah ko-adaptasi neuron.
+\item \textbf{Filter progresif (32$\rightarrow$64$\rightarrow$128)}: semakin dalam layer, semakin banyak fitur abstrak yang perlu ditangkap, sehingga jumlah filter ditingkatkan.
+\end{itemize}
+
+\subsection{Hyperparameter}
+Optimizer Adam dengan learning rate 0.001, batch size 32, dan 20 epoch. Total parameter: 618.754 (seluruhnya trainable).
+
+\section{Transfer Learning}
+\subsection{Pemilihan Model Base}
+ResNet18~\cite{he2016} dipilih dengan pertimbangan:
+\begin{itemize}
+\item \textbf{Kedalaman optimal}: 18 layer Residual Network memberikan representasi fitur yang kaya tanpa terlalu berat secara komputasi.
+\item \textbf{Residual connection}: Mengatasi masalah \textit{vanishing gradient} pada jaringan dalam, memungkinkan pelatihan yang lebih stabil.
+\item \textbf{Pretrained pada ImageNet}: Memberikan representasi fitur visual umum yang sudah terbukti efektif untuk berbagai tugas computer vision.
+\item \textbf{Input size $224\times224$}: kompromi yang baik antara detail informasi dan kecepatan komputasi.
+\end{itemize}
+
+\subsection{Strategi Transfer Learning}
+Pendekatan \textit{Feature Extraction} diterapkan: seluruh base model (ResNet18) di-freeze. Hanya classifier head (\textit{fully connected layer}) yang diganti dan dilatih dari awal. Detail classifier head: Dense(512$\rightarrow$256, ReLU) + Dropout(0.3) + Dense(256$\rightarrow$2, softmax). Total parameter: 11.308.354, dengan hanya 131.842 parameter trainable (1.17\%).
+
+\subsection{Preprocessing Khusus}
+Input gambar di-resize dari $32\times32$ ke $224\times224$ menggunakan \texttt{transforms.Resize(224)} dengan interpolasi bilinear, kemudian dinormalisasi menggunakan mean dan std standard ImageNet untuk menjaga konsistensi dengan pretrained weights.
+
+\section{Hasil}
+
+\subsection{CNN from Scratch}
+CNN from scratch mencapai akurasi testing 96.90\% dengan loss 0.0874. Training time: 20,18 detik. Akurasi training (99.04\%) lebih tinggi dari validation (97.20\%) mengindikasikan overfitting ringan (gap 1.84\%). Classification report menunjukkan precision, recall, dan F1-score yang seimbang pada kedua kelas (0.97).
+
+\subsection{Transfer Learning}
+Transfer Learning dengan ResNet18 menunjukkan performa yang kompetitif:
+\begin{itemize}
+\item \textbf{Test Accuracy}: 96.70\% (1.934/2.000)
+\item \textbf{Test Loss}: 0.0877
+\item \textbf{Training Time}: 112,84 detik
+\item \textbf{Overfitting Gap}: 0.0016 (sangat kecil)
+\end{itemize}
+Validation accuracy mencapai 97.00\%, dengan gap yang sangat kecil terhadap training accuracy (97.16\%), menunjukkan bahwa model tidak overfitting berkat representasi fitur pretrained yang sudah general.
+
+\subsection{Perbandingan Model}
+Tabel~\ref{tab:comparison} menyajikan perbandingan menyeluruh antara kedua pendekatan.
+
+\begin{table}[htbp]
+\caption{Perbandingan CNN from Scratch vs Transfer Learning}
+\centering
+\footnotesize
+\begin{tabular}{p{3cm}p{2.8cm}p{3cm}}
+\toprule
+\textbf{Aspek} & \textbf{CNN from Scratch} & \textbf{Transfer Learning} \\
+\midrule
+Akurasi Training & 99.04\% & 97.16\% \\
+Akurasi Validation & 97.20\% & 97.00\% \\
+Akurasi Testing & \textbf{96.90\%} & 96.70\% \\
+Loss Training & 0.0269 & 0.0720 \\
+Loss Validation & 0.0951 & 0.0787 \\
+Waktu Training & \textbf{20,18 s} & 112,84 s \\
+Jumlah Parameter & 618.754 & 11.308.354 \\
+Parameter Trainable & 618.754 & 131.842 \\
+Gap Overfitting & 0.0184 & \textbf{0.0016} \\
+\bottomrule
+\end{tabular}
+\label{tab:comparison}
+\end{table}
+
+\section{Pembahasan dan Analisis}
+\subsection{Performa Model}
+Hasil eksperimen menunjukkan bahwa CNN from scratch unggul tipis pada akurasi testing (96.90\% vs 96.70\%), namun perbedaannya tidak signifikan secara statistik. Yang lebih mencolok adalah perbedaan waktu training: CNN from scratch hanya membutuhkan 20,18 detik, jauh lebih cepat dibandingkan Transfer Learning yang memerlukan 112,84 detik. Hal ini disebabkan oleh:
+\begin{enumerate}
+\item CIFAR-10 beresolusi $32\times32$, input kecil sehingga CNN sederhana sudah cukup optimal.
+\item Transfer Learning harus me-resize gambar ke $224\times224$, menambah beban komputasi secara signifikan.
+\item ResNet18 memiliki 11,3 juta parameter meskipun hanya 131rb yang di-training, tetap harus di-load dan di-propagasi.
+\end{enumerate}
+
+\subsection{Overfitting}
+Kedua model menunjukkan risiko overfitting yang rendah. CNN from scratch memiliki gap training-validation sekitar 1.84\%, yang dapat diterima untuk jaringan yang dilatih dari awal. Transfer Learning menunjukkan gap yang sangat kecil (0.16\%), bahkan nyaris tidak ada — indikasi bahwa representasi fitur pretrained sudah sangat general. Regularisasi melalui Dropout, Batch Normalization, dan augmentasi data efektif menekan overfitting pada CNN from scratch.
+
+\subsection{Stabilitas Training}
+CNN from Scratch menunjukkan kurva learning yang lebih fluktuatif pada awal training namun stabil setelah epoch ke-12. Transfer Learning memiliki kurva yang lebih smooth secara keseluruhan. Fine-tuning tambahan tidak diterapkan pada eksperimen ini karena hasil feature extraction sudah optimal.
+
+\subsection{Kapan Menggunakan CNN from Scratch vs Transfer Learning}
+\textbf{CNN from scratch} direkomendasikan ketika:
+\begin{enumerate}
+\item Dataset besar ($>$10.000 per kelas) — CNN dapat belajar fitur spesifik domain dari data yang cukup.
+\item Resolusi gambar rendah ($<$64$\times$64) — transfer learning memerlukan resize yang boros komputasi.
+\item Kontrol penuh atas arsitektur diperlukan — untuk deployment di perangkat dengan resource terbatas.
+\item Tujuan edukasi atau penelitian arsitektur.
+\end{enumerate}
+
+\textbf{Transfer Learning} direkomendasikan ketika:
+\begin{enumerate}
+\item Dataset kecil ($<$1.000 per kelas) — pretrained features memberikan representasi awal yang kuat.
+\item Domain mirip ImageNet (natural images, object recognition).
+\item Waktu atau komputasi terbatas — meskipun lebih lama per epoch, konvergensi lebih cepat dalam jumlah epoch.
+\item Akurasi tinggi menjadi prioritas utama pada dataset natural images resolusi tinggi.
+\end{enumerate}
+
+\section{Studi Kasus}
+\subsection{Skenario 1: Citra Medis (300 gambar)}
+Dataset kecil dengan domain sangat berbeda dari ImageNet. CNN from scratch rentan overfitting. Transfer Learning dengan fine-tuning pada layer akhir dapat bekerja jika fitur low-level (tepi, tekstur) masih relevan. Augmentasi agresif diperlukan. Hasil diperkirakan lebih baik dengan Transfer Learning.
+
+\subsection{Skenario 2: 1 Juta Gambar Produk E-commerce}
+Dataset besar, domain natural images. CNN from scratch dapat digunakan dengan arsitektur deeper seperti ResNet~\cite{he2016} atau EfficientNet~\cite{tan2019}. Transfer Learning bisa sebagai baseline cepat. Kedua pendekatan feasible; pilihan tergantung budget komputasi dan kebutuhan akurasi.
+
+\subsection{Skenario 3: Prototipe 2 Hari (500 gambar)}
+Dataset kecil dengan waktu terbatas. Transfer Learning adalah pilihan terbaik: cukup freeze base, latih classifier head. Hasil baik dalam hitungan menit. CNN from scratch tidak disarankan — waktu tidak cukup untuk tuning arsitektur dan hyperparameter.
+
+\subsection{Skenario 4: Dataset Serupa CIFAR-10 dengan GPU Kencang}
+Berdasarkan hasil eksperimen, CNN from scratch lebih unggul untuk dataset resolusi rendah. Pendekatan hybrid: gunakan CNN from scratch sebagai model utama karena lebih cepat dan akurasinya kompetitif, kemudian verifikasi dengan Transfer Learning sebagai baseline pembanding.
+
+\section{Kesimpulan dan Refleksi}
+\subsection{Kesimpulan}
+Berdasarkan eksperimen klasifikasi pesawat dan mobil menggunakan CIFAR-10, dapat disimpulkan:
+\begin{enumerate}
+\item CNN from scratch menghasilkan akurasi testing 96.90\% lebih tinggi dibandingkan transfer learning (96.70\%).
+\item CNN from scratch jauh lebih cepat (20,18 detik) dibandingkan transfer learning (112,84 detik) karena CIFAR-10 beresolusi $32\times32$ cocok untuk arsitektur sederhana.
+\item CNN from scratch memiliki gap overfitting lebih besar (0.0184 vs 0.0016), menunjukkan transfer learning lebih stabil.
+\item Kedua model mencapai akurasi $>$96\%, menunjukkan dataset CIFAR-10 untuk perbandingan pesawat vs mobil relatif mudah diklasifikasikan.
+\item Untuk dataset citra natural resolusi rendah dengan data cukup, CNN from scratch bisa menjadi pilihan yang efisien.
+\end{enumerate}
+
+\subsection{Refleksi Pribadi}
+\begin{enumerate}
+\item \textbf{Tantangan terbesar}: Menentukan arsitektur CNN yang tepat tanpa overfitting — menyeimbangkan jumlah layer, filter size, dan regularisasi memerlukan eksperimen berulang.
+\item \textbf{Bagian tersulit}: CNN from scratch lebih sulit karena harus mendesain arsitektur dari nol dan tuning hyperparameter. Transfer learning cukup mengikuti best practice yang sudah mapan dengan memanfaatkan pretrained weights.
+\item \textbf{Perbedaan paling terasa}: Waktu training — CNN from scratch jauh lebih cepat (20s vs 113s) untuk dataset resolusi rendah. Namun stabilitas dan kemudahan implementasi lebih baik pada transfer learning.
+\item \textbf{Pilihan untuk kasus nyata}: Tergantung dataset. Untuk gambar resolusi rendah seperti CIFAR-10 ($32\times32$), CNN from scratch lebih efisien. Untuk gambar resolusi tinggi atau dataset kecil, Transfer Learning lebih unggul.
+\item \textbf{Pembelajaran}: Tidak ada solusi universal. Keputusan harus berdasarkan ukuran dataset, resolusi gambar, kemiripan domain, dan kebutuhan akurasi. Eksperimen langsung adalah cara terbaik memvalidasi asumsi.
+\end{enumerate}
+
+\section*{Referensi}
+\begin{thebibliography}{00}
+\bibitem{krizhevsky2009} A. Krizhevsky, ``Learning multiple layers of features from tiny images,'' Technical report, 2009.
+\bibitem{imagenet} J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei, ``ImageNet: A large-scale hierarchical image database,'' in \textit{Proc. CVPR}, 2009.
+\bibitem{he2016} K. He, X. Zhang, S. Ren, and J. Sun, ``Deep residual learning for image recognition,'' in \textit{Proc. CVPR}, 2016.
+\bibitem{simonyan2014} K. Simonyan and A. Zisserman, ``Very deep convolutional networks for large-scale image recognition,'' arXiv:1409.1556, 2014.
+\bibitem{tan2019} M. Tan and Q. V. Le, ``EfficientNet: Rethinking model scaling for convolutional neural networks,'' in \textit{Proc. ICML}, 2019.
+\end{thebibliography}
+\vspace{12pt}
+
+\end{document}

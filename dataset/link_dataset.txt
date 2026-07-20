@@ -1,0 +1,17 @@
+Dataset yang digunakan: CIFAR-10 (filter kelas airplane dan automobile)
+
+Sumber dataset:
+- Nama: CIFAR-10 (Canadian Institute for Advanced Research)
+- URL: https://www.cs.toronto.edu/~kriz/cifar.html
+- Diakses melalui: torchvision.datasets.CIFAR10 (download otomatis)
+
+Detail:
+- Kelas 0: Airplane (pesawat)
+- Kelas 1: Automobile (mobil)
+- Ukuran gambar: 32x32 piksel, RGB
+- Jumlah: 6.000 gambar per kelas (5.000 training, 1.000 test)
+- Total setelah filter: 10.000 training (digunakan 70% train, 15% val), 2.000 test
+
+Sumber alternatif jika diperlukan:
+- https://www.kaggle.com/datasets/abtabm/multiclassimagedatasetairplanecar
+- https://huggingface.co/datasets/uoft-cs/cifar10
