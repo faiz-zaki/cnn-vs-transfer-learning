@@ -1,0 +1,7 @@
+Nama : FAIZ ZAKI
+Kelas : TI5 A1
+NIM : 452024611006
+Prodi : Teknik Informatika
+Univ : Universitas Darussalam Gontor
+Link GITHUB: https://github.com/faiz-zaki/cnn-vs-transfer-learning.git
+
